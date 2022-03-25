@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <title>Bender Monitor</title>
+
+    <script>
+        const ws = new WebSocket('ws://bender.cs.wright.edu:8080');
+
+        ws.onmessage = function (message) {
+            let listItems = [
+                document.getElementById('list0'),
+                document.getElementById('list1'),
+                document.getElementById('list2'),
+                document.getElementById('list3'),
+                document.getElementById('list4'),
+            ];
+
+            let messageBody = JSON.parse(message.data);
+            console.log(messageBody);
+
+            messageBody.forEach((item, index) => {
+                listItems[index].innerHTML = 'Process ' + item.name + ' is using ' + item.mem + 'MB';
+            });
+        }
+    </script>
+</head>
+
+<body>
+    <ol>
+        <li id='list0'></li>
+        <li id='list1'></li>
+        <li id='list2'></li>
+        <li id='list3'></li>
+        <li id='list4'></li>
+    </ol>
+</body>
+
+</html>
