@@ -9,12 +9,17 @@
 
     <script>
         $(document).ready(() => {
-            try {
-                const ws = new WebSocket('ws://bender.cs.wright.edu:8080');
-            } catch (e) {
-                console.log("Couldn't connect to bender, using local websocket")
-                const ws = new WebSocket('ws://localhost:8080');
+            let search_params = new URLSearchParams(window.location.search);
+
+            if (search_params.has('ws')) {
+                var ws_url = search_params.get('ws');
             }
+
+            else {
+                var ws_url = "bender.cs.wright.edu";
+            }
+
+            const ws = new WebSocket(`ws://${ws_url}:8080`);
 
             ws.onmessage = function (message) {
                 let messageBody = JSON.parse(message.data);
