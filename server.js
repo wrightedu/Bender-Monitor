@@ -12,6 +12,14 @@ const server = http.createServer((req, res) => {
 
 server.listen(process.env.PORT || 3000);
 
+
+
+// ############################################
+// #####         WEB SOCKET STUFF         #####
+// ############################################
+
+
+
 const wss = new WebSocketServer({ port: 8080});
 var clients = [];
 
@@ -36,36 +44,103 @@ wss.on('connection', ws=>{
 
 console.log('websocket server started on localhost:8080');
 
+function sendData(data_type, data) {
+    clients.forEach(client=>{
+        client.send(JSON.stringify({
+            type: data_type,
+            timestamp: Date.now(),
+            data: data
+        }));
+    });
+}
+
+async function getMemUsage() {
+    var child = spawn('free');
+    child.stdout.setEncoding('utf8');
+
+    var stdout = '';
+
+    child.stdout.on('data', data=>{
+        stdout += data.toString();
+    });
+
+    return new Promise(resolve=>{
+        child.stdout.on('close', exit_code=>{
+            var lines = stdout.split('\n');
+            var mem_usage = Number(lines[1].split(/\s+/)[2]);
+            var swap_usage = Number(lines[2].split(/\s+/)[2]);
+            resolve({
+                mem_usage: mem_usage,
+                swap_usage: swap_usage
+            });
+        });
+    });
+}
+
+async function getCPUUsage() {
+    // We want to do ps -A -o pcpu | tail -n+2 | paste -sd+ | bc without pipes
+    var child = spawn('ps', ['-A', '-o', 'pcpu']);
+    child.stdout.setEncoding('utf8');
+    var stdout = '';
+
+    child.stdout.on('data', data=>{
+        stdout += data.toString();
+    });
+
+    return new Promise(resolve=>{
+        child.stdout.on('close', exit_code=>{
+            var lines = stdout.split('\n');
+            var cpu_usage = 0;
+            for (var i = 1; i < lines.length; i++) {
+                cpu_usage += Number(lines[i]);
+            }
+            resolve(cpu_usage);
+        });
+    });
+}
+
+async function getUsers() {
+    // Discard the first two lines, then add the first word from the rest of the lines into an array to return
+    var child = spawn('w');
+    child.stdout.setEncoding('utf8');
+    var stdout = '';
+
+    child.stdout.on('data', data=>{
+        stdout += data.toString();
+    });
+
+    return new Promise(resolve=>{
+        child.stdout.on('close', exit_code=>{
+            var lines = stdout.split('\n');
+            lines.pop()
+            var users = [];
+            for (var i = 2; i < lines.length; i++) {
+                users.push(lines[i].split(/\s+/)[0]);
+            }
+            resolve(users);
+        });
+    });
+}
+
+
 // create a function and set it to run every 10 seconds
 setInterval(()=>{
     console.log('Sending update');
 
-    // Run `ps -aux` and get the five processes that are using the most ram
-    var child = spawn('sh', ['-c', 'ps aux --sort -rss | head -n6 | tail -n5']);
-
-    child.stdout.setEncoding('utf-8');
-
-    var output = '';
-    child.stdout.on('data', data=>{
-        // console.log('Got some data: ' + data)
-        data = data.toString();
-        output += data;
+    // get the memory usage
+    getMemUsage().then(data=>{
+        // TODO: Check to see if there's any alert- or log-worthy memory data
+        sendData('mem-usage', data.mem_usage);
+        sendData('swap-usage', data.swap_usage);
     });
 
-    let processes = [];
+    // get the cpu usage
+    getCPUUsage().then(data=>{
+        sendData('cpu-usage', data);
+    });
 
-    child.stdout.on('close', exitCode=>{
-        let lines = output.split('\n');
-        lines.pop();
-        lines.forEach(i=>{
-            let cols = i.split(/\s+/);
-            // console.log(`Process ${cols[10]} is using ${(cols[5] / 1024).toFixed(0)}MB`);
-            processes.push({'name': cols[10], 'mem': (cols[5] / 1024).toFixed(0)});
-        });
-
-        // Send the data to each client
-        clients.forEach(i=>{
-            i.send(JSON.stringify(processes));
-        });
+    // get the users
+    getUsers().then(data=>{
+        sendData('current-users', data);
     });
 }, 1000);

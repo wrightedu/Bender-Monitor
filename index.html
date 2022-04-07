@@ -4,37 +4,60 @@
 
 <head>
     <title>Bender Monitor</title>
+    
+    <script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 
     <script>
-        const ws = new WebSocket('ws://bender.cs.wright.edu:8080');
+        $(document).ready(() => {
+            try {
+                const ws = new WebSocket('ws://bender.cs.wright.edu:8080');
+            } catch (e) {
+                console.log("Couldn't connect to bender, using local websocket")
+                const ws = new WebSocket('ws://localhost:8080');
+            }
 
-        ws.onmessage = function (message) {
-            let listItems = [
-                document.getElementById('list0'),
-                document.getElementById('list1'),
-                document.getElementById('list2'),
-                document.getElementById('list3'),
-                document.getElementById('list4'),
-            ];
+            ws.onmessage = function (message) {
+                let messageBody = JSON.parse(message.data);
+                console.log(messageBody);
 
-            let messageBody = JSON.parse(message.data);
-            console.log(messageBody);
+                if(messageBody.type === 'mem-usage') {
+                    $('#mem-usage').text(messageBody.data / (1024 * 1024) + ' GiB');
+                }
 
-            messageBody.forEach((item, index) => {
-                listItems[index].innerHTML = 'Process ' + item.name + ' is using ' + item.mem + 'MB';
-            });
-        }
+                if(messageBody.type === 'swap-usage') {
+                    $('#swap-usage').text(messageBody.data / (1024 * 1024) + ' GiB');
+                }
+
+                if(messageBody.type === 'cpu-usage') {
+                    $('#cpu-usage').text(messageBody.data);
+                }
+
+                if(messageBody.type === 'current-users') {
+                    let list = $('#current-users');
+
+                    list.empty();
+
+                    messageBody.data.forEach(user => {
+                        list.append(`<li>${user}</li>`);
+                    });
+                }
+            }
+        });
     </script>
 </head>
 
 <body>
-    <ol>
-        <li id='list0'></li>
-        <li id='list1'></li>
-        <li id='list2'></li>
-        <li id='list3'></li>
-        <li id='list4'></li>
-    </ol>
+    <h1>BENDER USAFE MAONITETR</h1>
+
+    <h2>Bender Status</h2>
+
+    <p>Memory Usage: <span id="mem-usage"></span></p>
+    <p>Swap Usage: <span id="swap-usage"></span></p>
+    <p>CPU Usage: <span id="cpu-usage"></span>%</p>
+
+    <ul id="current-users">
+
+    </ul>
 </body>
 
 </html>
